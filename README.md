@@ -80,7 +80,7 @@
      Hour12,
  }
  ```
- ## Variants of time format depending on Mode::Hour24, Mode::Hour12 and Hours::am_mp
+ ### Variants of time format depending on Mode::Hour24, Mode::Hour12 and Hours::am_mp
  
  Mode | am_pm | time format
  --- | --- | ---
