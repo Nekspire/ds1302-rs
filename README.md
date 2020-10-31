@@ -25,16 +25,16 @@
  
  More in -> https://github.com/Nekspire/ds1302-rs/tree/master/examples
  
- # The driver allows to:
+ ## The driver allows to:
  
  - Read and set clock and calendar data in 12-hour or 24-hour format .
  - Changing hour format without reseting it. `set_clock_mode()`
  
- # The driver does not allow to:
+ ## The driver does not allow to:
  
  - Currently using RAM is not supported.
  
- # Initialization
+ ## Initialization
  
  ```
  // External crates for IO and strings manipulation 
@@ -47,7 +47,7 @@
  let mut ds1302 = DS1302::new(spi, cs, ds1302_mode::Hour12).unwrap();
  
  ```
-  # Read time and date
+  ## Read time and date
  ```
  let mut data = String::<U32>::from(" ");
  let mut text = " ";
@@ -80,7 +80,7 @@
      Hour12,
  }
  ```
- Variants of time format depending on Mode::Hour24, Mode::Hour12 and Hours::am_mp
+ ## Variants of time format depending on Mode::Hour24, Mode::Hour12 and Hours::am_mp
  
  Mode | am_pm | time format
  --- | --- | ---
@@ -90,7 +90,7 @@
  Hour24 | 1 | -
  
  
- # Set time and date
+ ## Set time and date
  
  ```
  let h = Hours {hours: 4, am_pm: 1};
