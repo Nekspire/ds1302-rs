@@ -92,7 +92,8 @@
 //! 
 //! ```
 //! 
-
+//!
+//! 
 #![no_std]
 
 use embedded_hal as hal;
