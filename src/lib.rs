@@ -4,14 +4,15 @@
 //! 
 //! DS1302 is a real time clock/calendar (RTCC) chip, which communicates with SPI interface.  
 //! The device provides seconds, minutes, hours, day, date, month, and year information.
-//!Driver is based on [embedded-hal] traits.
+//!Driver is based on [`embedded-hal`] traits.
 //! Datasheet: [DS1302](https://datasheets.maximintegrated.com/en/ds/DS1302.pdf)
 //! 
+//! [`embedded-hal`]: https://github.com/rust-embedded/embedded-hal
 //! 
 //! # The driver allows to:
 //! 
 //! - Read and set clock and calendar data in 12-hour or 24-hour format .
-//! - Changing hour format without reseting it. [`set_clock_mode()`].
+//! - Changing hour format without reseting it. `set_clock_mode()`.
 //! 
 //! # The driver does not allow to:
 //! 
