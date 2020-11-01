@@ -108,4 +108,11 @@
  ds1302.set_clock_calendar(clk, cal).unwrap();
  
  ```
- 
+ ## License
+
+Copyright © 2020 Nekspire
+
+Dual licensed under your choice of either of:
+
+- Apache License, Version 2.0, (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license (LICENSE-MIT or http://opensource.org/licenses/MIT)
