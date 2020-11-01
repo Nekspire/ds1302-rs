@@ -1,4 +1,9 @@
 # ds1302-rs
+
+[![crates.io badge](https://img.shields.io/crates/v/ds1302.svg)](https://crates.io/crates/ds1302)
+[![docs.rs badge](https://docs.rs/ds1302/badge.svg)](https://docs.rs/ds1302)
+
+
  DS1302 real time clock-calendar platform agnostic driver 
 
 ![](images/ds1302_board.jpg)
