@@ -6,6 +6,7 @@ edition = "2018"
 description = "A platform agnostic driver to interface with the DS1302 real time clock-calendar"
 keywords = ["no-std", "ds1302", "rtc", "embedded", "embedded-hal-driver"]
 readme = "README.md"
+documentation = "https://docs.rs/ds1302"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Nekspire/ds1302-rs"
 categories  = ["embedded", "hardware-support", "no-std"]
