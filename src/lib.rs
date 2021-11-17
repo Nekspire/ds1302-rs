@@ -1,35 +1,35 @@
 //! DS1302 platform agnostic driver crate
 //!
 //! # About
-//! 
+//!
 //! DS1302 is a real time clock/calendar (RTCC) chip, which communicates with SPI interface.  
 //! The device provides seconds, minutes, hours, day, date, month, and year information.
 //!Driver is based on [`embedded-hal`] traits.
 //! Datasheet: [DS1302](https://datasheets.maximintegrated.com/en/ds/DS1302.pdf)
-//! 
+//!
 //! [`embedded-hal`]: https://github.com/rust-embedded/embedded-hal
-//! 
+//!
 //! # The driver allows to:
-//! 
+//!
 //! - Read and set clock and calendar data in 12-hour or 24-hour format .
 //! - Changing hour format without reseting it. `set_clock_mode()`.
-//! 
+//!
 //! # The driver does not allow to:
-//! 
+//!
 //! - Currently using RAM is not supported.
-//! 
+//!
 //! # Initialization
-//! 
+//!
 //! ```
-//! // External crates for IO and strings manipulation 
+//! // External crates for IO and strings manipulation
 //! use core::fmt::Write;
 //! use heapless::String;
 //! // DS1302 driver crate
 //! use ds1302::{DS1302, Hours, Clock, Calendar, Mode as ds1302_mode};
-//! 
+//!
 //! // Create with DS1302::new(), specify hour format mode: ds1302_mode::Hour12, in this case
 //! let mut ds1302 = DS1302::new(spi, cs, ds1302_mode::Hour12).unwrap();
-//! 
+//!
 //! ```
 //!  # Read time and date
 //! ```
@@ -50,32 +50,32 @@
 //!             cl.1.day, cl.1.date, cl.1.month, cl.1.year,
 //!             cl.0.hours.hours, cl.0.minutes, cl.0.seconds, text);
 //! ```
-//! 
-//! 
+//!
+//!
 //! From lib.rs:
 //! ```
 //! pub struct Hours {
 //!     pub hours: u8,
 //!     pub am_pm: u8,
-//! } 
-//! 
+//! }
+//!
 //! pub enum Mode {
 //!     Hour24,
 //!     Hour12,
 //! }
 //! ```
 //! Variants of time format depending on Mode::Hour24, Mode::Hour12 and Hours::am_mp
-//! 
+//!
 //! Mode | am_pm | time format
 //! --- | --- | ---
 //! Hour12 | 0 | AM
 //! Hour12 | 1 | PM
 //! Hour24 | 0 | -
 //! Hour24 | 1 | -
-//! 
-//! 
+//!
+//!
 //! # Set time and date
-//! 
+//!
 //! ```
 //! let h = Hours {hours: 4, am_pm: 1};
 //! let clk = Clock {
@@ -90,28 +90,54 @@
 //!     year: 2020
 //! };
 //! ds1302.set_clock_calendar(clk, cal).unwrap();
-//! 
-//! ```
-//! 
 //!
-//! 
+//! ```
+//!
+//!
+//!
 #![no_std]
 
 use embedded_hal as hal;
+use fugit::ExtU32;
 use hal::blocking::spi;
 use hal::digital::v2::OutputPin;
 use registers::Register;
 
-const CLOCK_HALT_FLAG: u8 =     0x80;
-const WRITE_PROTECT_BIT: u8 =   0x80;
-const READ_BIT: u8 =            0x1;
-const HOUR_12_BIT: u8 =         0x80;
-const HOUR_PM_BIT: u8 =         0x20;
+const CLOCK_HALT_FLAG: u8 = 0x80;
+const WRITE_PROTECT_BIT: u8 = 0x80;
+const READ_BIT: u8 = 0x1;
+const HOUR_12_BIT: u8 = 0x80;
+const HOUR_PM_BIT: u8 = 0x20;
+
+/// For timing `ds1302` uses [fugit](https://lib.rs/crates/fugit) crate which only provides `Duration` and `Instant` types.
+/// It does not provide any clock or timer traits.
+/// Therefore `ds1302` has its own `Delay` trait that provides all timing capabilities that are needed for the library.
+/// User must implement this trait for the timer by itself.
+pub trait Delay<const TIMER_HZ: u32> {
+    /// An error that might happen during waiting
+    type Error;
+
+    /// Return current time `Instant`
+    fn now(&mut self) -> fugit::TimerInstantU32<TIMER_HZ>;
+
+    /// Start countdown with a `duration`
+    fn start(&mut self, duration: fugit::TimerDurationU32<TIMER_HZ>) -> Result<(), Self::Error>;
+
+    /// Wait until countdown `duration` has expired.
+    /// Must return `nb::Error::WouldBlock` if countdown `duration` is not yet over.
+    /// Must return `OK(())` as soon as countdown `duration` has expired.
+    fn wait(&mut self) -> nb::Result<(), Self::Error>;
+}
+
 ///DS1302 RTCC driver
-pub struct DS1302<SPI , CS> {
+pub struct DS1302<SPI, CS, CLK, const TIMER_HZ: u32>
+where
+    CLK: Delay<TIMER_HZ>,
+{
     spi: SPI,
     cs: CS,
-    pub mode: Mode
+    pub mode: Mode,
+    timer: CLK,
 }
 ///Hour format: 12-hour (AM/PM) or 24-hour
 pub enum Mode {
@@ -127,26 +153,32 @@ pub struct Hours {
 pub struct Clock {
     pub hours: Hours,
     pub minutes: u8,
-    pub seconds: u8
+    pub seconds: u8,
 }
 ///Calendar information
 pub struct Calendar {
     pub day: u8,
     pub date: u8,
     pub month: u8,
-    pub year: u16
+    pub year: u16,
 }
 
 mod registers;
 
-impl <SPI, CS, E, PinError> DS1302<SPI, CS>
-where 
+impl<SPI, CS, E, PinError, CLK, const TIMER_HZ: u32> DS1302<SPI, CS, CLK, TIMER_HZ>
+where
     SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
-    CS: OutputPin<Error = PinError>
+    CS: OutputPin<Error = PinError>,
+    CLK: Delay<TIMER_HZ>,
 {
     ///Creates new instance DS1302 RTC
-    pub fn new(spi: SPI, cs: CS, mode: Mode) -> Result<Self, E> {
-        let mut ds1302 = DS1302 {spi, cs, mode: Mode::Hour12};
+    pub fn new(spi: SPI, cs: CS, mode: Mode, timer: CLK) -> Result<Self, E> {
+        let mut ds1302 = DS1302 {
+            spi,
+            cs,
+            mode: Mode::Hour12,
+            timer,
+        };
         // Check CLOCK HALT FLAG bit
         let byte = ds1302.read_reg(Register::SECONDS.addr())?;
         // Reset CLOCK HALT FLAG bit, power on device
@@ -155,45 +187,49 @@ where
             let byte = ds1302.read_reg(Register::SECONDS.addr())?;
             if (byte & CLOCK_HALT_FLAG) != 0 {
                 unimplemented!() // error condition
-            }
-            else {
+            } else {
                 ds1302.set_clock_mode(mode)?;
                 Ok(ds1302)
             }
-        }
-        else {
+        } else {
             ds1302.set_clock_mode(mode)?;
             Ok(ds1302)
         }
     }
     ///Delete DS1302 RTC instance and return SPI interface and cs PIN
-    pub fn destroy(self) -> Result<(SPI,CS), E> {
-        Ok((self.spi, self.cs))
+    pub fn destroy(self) -> Result<(SPI, CS, CLK), E> {
+        Ok((self.spi, self.cs, self.timer))
     }
 
-    fn read_reg(&mut self, reg: u8) -> Result<u8, E>  {
+    fn read_reg(&mut self, reg: u8) -> Result<u8, E> {
         let mut bytes = [reg | READ_BIT, 0];
+        nb::block!(self.timer.wait()).ok(); // wait CE inactive time min 4us
         self.cs.set_high().ok();
         self.spi.transfer(&mut bytes).ok();
         self.cs.set_low().ok();
+        self.timer.start(4.micros()).ok();
         Ok(bytes[1])
     }
 
-    fn write_reg(&mut self, reg: u8, byte: u8) -> Result<(), E> { 
+    fn write_reg(&mut self, reg: u8, byte: u8) -> Result<(), E> {
         self.bcd_to_decimal(byte)?;
         //Firstly Check WRITE_PROTECT_BIT
         let wp_read = self.read_reg(Register::WP.addr())?;
-        if(wp_read & WRITE_PROTECT_BIT) != 0 {
+        if (wp_read & WRITE_PROTECT_BIT) != 0 {
             let mut bytes = [Register::WP.addr(), 0];
+            nb::block!(self.timer.wait()).ok(); // wait CE inactive time min 4us
             self.cs.set_high().ok();
             self.spi.write(&mut bytes).ok();
             self.cs.set_low().ok();
+            self.timer.start(4.micros()).ok();
         }
         //Then write current data to registers
         let mut bytes = [reg, byte];
+        nb::block!(self.timer.wait()).ok(); // wait CE inactive time min 4us
         self.cs.set_high().ok();
         self.spi.write(&mut bytes).ok();
         self.cs.set_low().ok();
+        self.timer.start(4.micros()).ok();
         Ok(())
     }
     // Swap format from bcd to decmial
@@ -216,20 +252,17 @@ where
     }
     ///Return current information about hours
     pub fn get_hours(&mut self) -> Result<Hours, E> {
-        let mut hr = Hours {
-            hours:  0,
-            am_pm: 0
-        };
+        let mut hr = Hours { hours: 0, am_pm: 0 };
         let mut byte = self.read_reg(Register::HOURS.addr())?;
         if (byte & HOUR_12_BIT) != 0 {
             //In case 12-hour format
-            if(byte & HOUR_PM_BIT) != 0 {
+            if (byte & HOUR_PM_BIT) != 0 {
                 // It's PM
-                byte &= !(HOUR_12_BIT | HOUR_PM_BIT); // Clear 7th and 5th bits to designate hours 
+                byte &= !(HOUR_12_BIT | HOUR_PM_BIT); // Clear 7th and 5th bits to designate hours
                 hr.am_pm = 1;
             } else {
                 // It's AM
-                byte &= !(HOUR_12_BIT); // Clear 7th bit to designate hours 
+                byte &= !(HOUR_12_BIT); // Clear 7th bit to designate hours
             }
         }
         hr.hours = self.bcd_to_decimal(byte)?;
@@ -259,23 +292,22 @@ where
     pub fn get_clock(&mut self) -> Result<Clock, E> {
         let mut bytes = [0_u8; 4];
         bytes[0] = Register::CLKBURS.addr() | 1_u8;
+        nb::block!(self.timer.wait()).ok(); // wait CE inactive time min 4us
         self.cs.set_high().ok();
         self.spi.transfer(&mut bytes)?;
         self.cs.set_low().ok();
+        self.timer.start(4.micros()).ok();
 
-        let mut hr = Hours {
-            hours:  0,
-            am_pm: 0
-        };
+        let mut hr = Hours { hours: 0, am_pm: 0 };
         if (bytes[3] & HOUR_12_BIT) != 0 {
             //In case 12-hour format
-            if(bytes[3] & HOUR_PM_BIT) != 0 {
+            if (bytes[3] & HOUR_PM_BIT) != 0 {
                 // It's PM
-                bytes[3] &= !(HOUR_12_BIT | HOUR_PM_BIT); // Clear 7th and 5th bits to designate hours 
+                bytes[3] &= !(HOUR_12_BIT | HOUR_PM_BIT); // Clear 7th and 5th bits to designate hours
                 hr.am_pm = 1;
             } else {
                 // It's AM
-                bytes[3] &= !(HOUR_12_BIT); // Clear 7th bit to designate hours 
+                bytes[3] &= !(HOUR_12_BIT); // Clear 7th bit to designate hours
             }
         }
         hr.hours = self.bcd_to_decimal(bytes[3])?;
@@ -291,10 +323,12 @@ where
     pub fn get_calendar(&mut self) -> Result<Calendar, E> {
         let mut bytes = [0_u8; 8];
         bytes[0] = Register::CLKBURS.addr() | 1_u8;
+        nb::block!(self.timer.wait()).ok(); // wait CE inactive time min 4us
         self.cs.set_high().ok();
         self.spi.transfer(&mut bytes)?;
         self.cs.set_low().ok();
-        
+        self.timer.start(4.micros()).ok();
+
         let calendar = Calendar {
             date: self.bcd_to_decimal(bytes[4])?,
             day: self.bcd_to_decimal(bytes[5])?,
@@ -308,23 +342,22 @@ where
     pub fn get_clock_calendar(&mut self) -> Result<(Clock, Calendar), E> {
         let mut bytes = [0_u8; 8];
         bytes[0] = Register::CLKBURS.addr() | 1_u8;
+        nb::block!(self.timer.wait()).ok(); // wait CE inactive time min 4us
         self.cs.set_high().ok();
         self.spi.transfer(&mut bytes)?;
         self.cs.set_low().ok();
+        self.timer.start(4.micros()).ok();
 
-        let mut hr = Hours {
-            hours:  0,
-            am_pm: 0
-        };
+        let mut hr = Hours { hours: 0, am_pm: 0 };
         if (bytes[3] & HOUR_12_BIT) != 0 {
             //In case 12-hour format
-            if(bytes[3] & HOUR_PM_BIT) != 0 {
+            if (bytes[3] & HOUR_PM_BIT) != 0 {
                 // It's PM
-                bytes[3] &= !(HOUR_12_BIT | HOUR_PM_BIT); // Clear 7th and 5th bits to designate hours 
+                bytes[3] &= !(HOUR_12_BIT | HOUR_PM_BIT); // Clear 7th and 5th bits to designate hours
                 hr.am_pm = 1;
             } else {
                 // It's AM
-                bytes[3] &= !(HOUR_12_BIT); // Clear 7th bit to designate hours 
+                bytes[3] &= !(HOUR_12_BIT); // Clear 7th bit to designate hours
             }
         }
         hr.hours = self.bcd_to_decimal(bytes[3])?;
@@ -332,7 +365,7 @@ where
             seconds: self.bcd_to_decimal(bytes[1])?,
             minutes: self.bcd_to_decimal(bytes[2])?,
             hours: hr,
-        }; 
+        };
 
         let calendar = Calendar {
             date: self.bcd_to_decimal(bytes[4])?,
@@ -344,19 +377,19 @@ where
         Ok((clock, calendar))
     }
     ///Set seconds to defined value
-    pub fn set_seconds(&mut self, seconds: u8) -> Result<(),E> {
-        let byte = self.decimal_to_bcd(seconds)?; 
+    pub fn set_seconds(&mut self, seconds: u8) -> Result<(), E> {
+        let byte = self.decimal_to_bcd(seconds)?;
         self.write_reg(Register::SECONDS.addr(), byte)?;
         Ok(())
     }
     ///Set minutes to defined value
-    pub fn set_minutes(&mut self, minutes: u8) -> Result<(),E> {
-        let byte = self.decimal_to_bcd(minutes)?; 
+    pub fn set_minutes(&mut self, minutes: u8) -> Result<(), E> {
+        let byte = self.decimal_to_bcd(minutes)?;
         self.write_reg(Register::MINUTES.addr(), byte)?;
         Ok(())
     }
     ///Set hours to defined value
-    pub fn set_hours(&mut self, hours: Hours) -> Result<(),E> {
+    pub fn set_hours(&mut self, hours: Hours) -> Result<(), E> {
         let mut byte = self.decimal_to_bcd(hours.hours)?;
         match self.mode {
             Mode::Hour12 => {
@@ -372,41 +405,43 @@ where
         Ok(())
     }
     ///Set date to defined value
-    pub fn set_date(&mut self, date: u8) -> Result<(),E> {
-        let byte = self.decimal_to_bcd(date)?; 
+    pub fn set_date(&mut self, date: u8) -> Result<(), E> {
+        let byte = self.decimal_to_bcd(date)?;
         self.write_reg(Register::DATE.addr(), byte)?;
         Ok(())
     }
     ///Set month to defined value
-    pub fn set_month(&mut self, month: u8) -> Result<(),E> {
-        let byte = self.decimal_to_bcd(month)?; 
+    pub fn set_month(&mut self, month: u8) -> Result<(), E> {
+        let byte = self.decimal_to_bcd(month)?;
         self.write_reg(Register::MONTH.addr(), byte)?;
         Ok(())
     }
     ///Set day of the week to defined value
-    pub fn set_day(&mut self, day: u8) -> Result<(),E> {
-        let byte = self.decimal_to_bcd(day)?; 
+    pub fn set_day(&mut self, day: u8) -> Result<(), E> {
+        let byte = self.decimal_to_bcd(day)?;
         self.write_reg(Register::DAY.addr(), byte)?;
         Ok(())
     }
     ///Set year to defined value
-    pub fn set_year(&mut self, mut year: u16) -> Result<(),E> {
-        if year < 2000 {year = 2000}
+    pub fn set_year(&mut self, mut year: u16) -> Result<(), E> {
+        if year < 2000 {
+            year = 2000
+        }
         year -= 2000;
-        let byte = self.decimal_to_bcd(year as u8)?; 
+        let byte = self.decimal_to_bcd(year as u8)?;
         self.write_reg(Register::YEAR.addr(), byte)?;
         Ok(())
     }
     ///Set clock to defined values
-    pub fn set_clock(&mut self, clock: Clock) -> Result<(),E> {
-         //Not burst mode, because it changes the calendar registers
+    pub fn set_clock(&mut self, clock: Clock) -> Result<(), E> {
+        //Not burst mode, because it changes the calendar registers
         self.set_hours(clock.hours)?;
         self.set_minutes(clock.minutes)?;
         self.set_seconds(clock.seconds)?;
         Ok(())
     }
     ///Set calendar to defined values
-    pub fn set_calendar(&mut self, calendar: Calendar) -> Result<(),E> {
+    pub fn set_calendar(&mut self, calendar: Calendar) -> Result<(), E> {
         //Not burst mode, because it changes the clock registers
         self.set_year(calendar.year)?;
         self.set_month(calendar.month)?;
@@ -415,7 +450,7 @@ where
         Ok(())
     }
     ///Set clock and calendar to defined values
-    pub fn set_clock_calendar(&mut self, clock: Clock, mut calendar: Calendar) -> Result<(),E> {
+    pub fn set_clock_calendar(&mut self, clock: Clock, mut calendar: Calendar) -> Result<(), E> {
         //Writing in burst mode, it changes all the clock and calendar registers
         let mut bytes = [0_u8; 9];
         bytes[0] = Register::CLKBURS.addr();
@@ -435,12 +470,16 @@ where
         bytes[4] = self.decimal_to_bcd(calendar.date)?;
         bytes[5] = self.decimal_to_bcd(calendar.month)?;
         bytes[6] = self.decimal_to_bcd(calendar.day)?;
-        if calendar.year < 2000 {calendar.year = 2000}
+        if calendar.year < 2000 {
+            calendar.year = 2000
+        }
         calendar.year -= 2000;
         bytes[7] = self.decimal_to_bcd(calendar.year as u8)?;
+        nb::block!(self.timer.wait()).ok(); // wait CE inactive time min 4us
         self.cs.set_high().ok();
         self.spi.write(&mut bytes)?;
         self.cs.set_low().ok();
+        self.timer.start(4.micros()).ok();
         Ok(())
     }
     ///Switch between 12-hour (AM/PM) and 24-hour mode
@@ -461,8 +500,7 @@ where
     }
 }
 
-
-fn change_hour_to(mode: &Mode,mut hour: Hours) -> Hours {
+fn change_hour_to(mode: &Mode, mut hour: Hours) -> Hours {
     match mode {
         Mode::Hour24 => {
             if hour.am_pm == 1 {

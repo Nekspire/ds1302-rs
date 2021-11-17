@@ -22,6 +22,8 @@ include = [
 
 [dependencies]
 embedded-hal = "0.2.4"
+nb = "1.0.0"
+fugit = "0.3.0"
 
 [profile.dev]
 opt-level = 0
