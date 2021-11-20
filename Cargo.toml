@@ -25,8 +25,18 @@ embedded-hal = "0.2.4"
 nb = "1.0.0"
 fugit = "0.3.0"
 
+[dev-dependencies]
+stm32f1xx-hal = {path = "examples/stm32f1xx-hal", version = "0.7.0", features = ["rt", "stm32f103", "medium"]}
+cortex-m = "^0.6"
+cortex-m-rt = "^0.7"
+embedded-graphics = "^0.6"
+heapless = "^0.6"
+ssd1306 = "^0.5"
+panic-halt = "^0.2"
+
 [profile.dev]
-opt-level = 0
+opt-level = 1
+debug = true
 
 [profile.release]
 opt-level = 3
