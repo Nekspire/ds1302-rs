@@ -28,11 +28,11 @@ fugit = "0.3.0"
 [dev-dependencies]
 stm32f1xx-hal = {path = "examples/stm32f1xx-hal", version = "0.7.0", features = ["rt", "stm32f103", "medium"]}
 cortex-m = "^0.6"
-cortex-m-rt = "^0.7"
+cortex-m-rt = ">=0.6.15"
 embedded-graphics = "^0.6"
 heapless = "^0.6"
 ssd1306 = "^0.5"
-panic-halt = "^0.2"
+panic-probe = { version = "^0.2", features = ["print-rtt"] }
 
 [profile.dev]
 opt-level = 1
@@ -40,3 +40,7 @@ debug = true
 
 [profile.release]
 opt-level = 3
+
+[[example]]
+name = "bluepill_ssd1306"
+crate-type = ["bin"]

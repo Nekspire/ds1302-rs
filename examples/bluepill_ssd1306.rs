@@ -3,7 +3,8 @@
 
 use cortex_m;
 use cortex_m_rt::entry;
-use panic_halt as _;
+//use panic_halt as _;
+use panic_probe as _;
 
 use ssd1306::{prelude::*, Builder, I2CDIBuilder};
 

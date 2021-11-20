@@ -38,9 +38,23 @@ DS1302 RTC Board - Waveshare
 ## Examples
 https://github.com/Nekspire/ds1302-rs/tree/master/examples
 
- To build examples run:
+This crate uses [`probe-run`](https://crates.io/crates/probe-run) to run the examples.
+
+To build examples type:
 
 `cargo build --examples` or `cargo build --examples --release`
+
+To run examples type:
+
+`cargo run --example <example name>` or `cargo run --example <example name> --release`
+
+The output should be like this:
+
+```
+Running `probe-run --chip STM32F103C8 target/thumbv7m-none-eabi/debug/examples/bluepill_ssd1306`
+(HOST) INFO  flashing program (36.32 KiB)
+(HOST) INFO  success!
+```
 
  ## License
 
