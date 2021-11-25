@@ -9,11 +9,11 @@ use panic_probe as _;
 use ssd1306::{prelude::*, Builder, I2CDIBuilder};
 
 use stm32f1xx_hal::{
+    delay::Delay as HAL_DELAY,
     i2c::{BlockingI2c, DutyCycle, Mode as OtherMode},
     prelude::*,
     spi::{Mode, Phase, Polarity, Spi},
     stm32,
-    delay::Delay as HAL_DELAY
 };
 
 use ds1302::{Calendar, Clock, Delay, Hours, Mode as ds1302_mode, DS1302};
@@ -130,10 +130,7 @@ fn main() -> ! {
 
     let mut ds1302 = DS1302::new(spi, cs, ds1302_mode::Hour12, ds_timer).unwrap();
 
-    let h = Hours {
-        hours: 19,
-        am_pm: 0,
-    };
+    let h = Hours::Hour24(19);
     let clk = Clock {
         hours: h,
         minutes: 24,
@@ -149,30 +146,17 @@ fn main() -> ! {
     ds1302.set_clock_mode(ds1302_mode::Hour24).unwrap();
 
     let mut data = String::<U32>::from(" ");
-    let mut text = " ";
     loop {
         let cl = ds1302.get_clock_calendar().unwrap();
-        match ds1302.mode {
-            ds1302_mode::Hour12 => {
-                if cl.0.hours.am_pm == 1 {
-                    text = " PM"
-                } else {
-                    text = " AM"
-                }
-            }
-            ds1302_mode::Hour24 => text = "",
-        }
+        let (text, h) = match cl.0.hours {
+            Hours::Hour24(h) => ("", h),
+            Hours::Hour12am(h) => ("am", h),
+            Hours::Hour12pm(h) => ("pm", h),
+        };
         let _ = write!(
             data,
             "{} {}.{}.{}\n{:02}:{:02}:{:02} {}",
-            cl.1.day,
-            cl.1.date,
-            cl.1.month,
-            cl.1.year,
-            cl.0.hours.hours,
-            cl.0.minutes,
-            cl.0.seconds,
-            text
+            cl.1.day, cl.1.date, cl.1.month, cl.1.year, h, cl.0.minutes, cl.0.seconds, text
         );
 
         Text::new(data.as_str(), Point::new(30, 10))
