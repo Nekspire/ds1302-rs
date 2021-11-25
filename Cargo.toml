@@ -1,6 +1,6 @@
 [package]
 name = "ds1302"
-version = "2.0.0"
+version = "3.0.0"
 authors = ["Nekspire  <nekspire@gmail.com>"]
 edition = "2018"
 description = "A platform agnostic driver to interface with the DS1302 real time clock-calendar"
