@@ -153,6 +153,14 @@ impl Hours {
             Hours::Hour12am(h) => Hours::Hour24(h),
         }
     }
+
+    pub fn hour(&self) -> (u8, Option<bool>) {
+        match *self {
+            Hours::Hour24(h) => (h, None),
+            Hours::Hour12am(h) => (h, Some(false)),
+            Hours::Hour12pm(h) => (h, Some(true)),
+        }
+    }
 }
 
 impl From<u8> for Hours {
