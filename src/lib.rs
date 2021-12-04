@@ -1,87 +1,28 @@
-//! DS1302 platform agnostic driver crate
+//! DS1302 real time clock-calendar platform agnostic driver
 //!
 //! # About
 //!
-//! DS1302 is a real time clock/calendar (RTCC) chip, which communicates with SPI interface.  
-//! The device provides seconds, minutes, hours, day, date, month, and year information.
-//!Driver is based on [`embedded-hal`] traits.
-//! Datasheet: [DS1302](https://datasheets.maximintegrated.com/en/ds/DS1302.pdf)
+//!The DS1302 trickle-charge timekeeping chip contains a real-time clock/calendar and 31 bytes of static RAM. It
+//!communicates with a microprocessor via a simple serial interface. The real-time clock/calendar provides seconds,
+//!minutes, hours, day, date, month, and year information. The end of the month date is automatically adjusted for
+//!months with fewer than 31 days, including corrections for leap year. The clock operates in either the 24-hour or
+//!12-hour format with an AM/PM indicator. The chip driver is based on [`embedded-hal`] traits.
 //!
 //! [`embedded-hal`]: https://github.com/rust-embedded/embedded-hal
 //!
-//! # The driver allows to:
+//!Datasheet: [DS1302](https://datasheets.maximintegrated.com/en/ds/DS1302.pdf)
 //!
-//! - Read and set clock and calendar data in 12-hour or 24-hour format .
-//! - Changing hour format without reseting it. `set_clock_mode()`.
-//!
-//! # The driver does not allow to:
-//!
-//! - Currently using RAM is not supported.
-//!
-//! # Initialization
-//!
-//! ```
-//! // External crates for IO and strings manipulation
-//! use core::fmt::Write;
-//! use heapless::String;
-//! // DS1302 driver crate
-//! use ds1302::{DS1302, Hours, Clock, Calendar, Mode as ds1302_mode};
-//!
-//! // Create with DS1302::new(), specify hour format mode: ds1302_mode::Hour12, in this case
-//! let mut ds1302 = DS1302::new(spi, cs, ds1302_mode::Hour12).unwrap();
-//!
-//! ```
-//!  # Read time and date
-//! ```
-//! let mut data = String::<U32>::from(" ");
-//!
-//! let cl = ds1302.get_clock_calendar().unwrap();
-//! let (text, h) = match cl.0.hours {
-//!     Hours::Hour24(h) => ("", h),
-//!     Hours::Hour12am(h) => ("am", h),
-//!     Hours::Hour12pm(h) => ("pm", h),
-//! };
-//! // Glue cl reads in string called "data", and use it later ...
-//! let _=write!(data,"{} {}.{}.{}\n{:02}:{:02}:{:02} {}",
-//!             cl.1.day, cl.1.date, cl.1.month, cl.1.year,
-//!             h, cl.0.minutes, cl.0.seconds, text);
-//! ```
+//! ## Driver features:
+//! - Reading/setting clock/calendar data
+//! - 12-hour (AM/PM) or 24-hour format
+//! - Changing the time format while the chip is working
 //!
 //!
-//! From lib.rs:
-//! ```
-//! pub enum Hours {
-//!     Hour24(u8),
-//!     Hour12am(u8),
-//!     Hour12pm(u8),
-//! }
-//! pub enum Mode {
-//!     Hour24,
-//!     Hour12,
-//! }
-//! ```
+//! NEW (4.0.0 release):
+//! - Programmable Trickle Charger configuration
+//! - 31 x 8 Battery-Backed General-Purpose RAM operations
 //!
-//!
-//! # Set time and date
-//!
-//! ```
-//! let clk = Clock {
-//!     hours: Hours::Hour12pm(4),
-//!     minutes: 29,
-//!     seconds: 0
-//! };
-//! let cal = Calendar {
-//!     day: 2,
-//!     date: 27,
-//!     month: 10,
-//!     year: 2020
-//! };
-//! ds1302.set_clock_calendar(clk, cal).unwrap();
-//!
-//! ```
-//!
-//!
-//!
+
 #![no_std]
 
 use core::convert::From;

@@ -7,9 +7,12 @@
  DS1302 real time clock-calendar platform agnostic driver
 
  # About
- 
- DS1302 is a real time clock/calendar chip, which communicates via SPI interface. The device provides seconds, minutes, hours, day, date, month, and year information.
- The driver is based on [`embedded-hal`] traits.
+
+The DS1302 trickle-charge timekeeping chip contains a real-time clock/calendar and 31 bytes of static RAM. It
+communicates with a microprocessor via a simple serial interface. The real-time clock/calendar provides seconds,
+minutes, hours, day, date, month, and year information. The end of the month date is automatically adjusted for
+months with fewer than 31 days, including corrections for leap year. The clock operates in either the 24-hour or
+12-hour format with an AM/PM indicator. The chip driver is based on [`embedded-hal`] traits.
 
 Datasheet: [DS1302](https://datasheets.maximintegrated.com/en/ds/DS1302.pdf)
 
@@ -21,19 +24,22 @@ DS1302 RTC Board - Waveshare
 
  
  ## Hardware requirements
- - **Importand**: SPI frame format with **LSB transmitted first!**
- - SPI speed less than 2 MHz
- - CPOL: CK to 0 when idle, CPHA: the first clock transition is the first data capture edge
- - Default 8-bit data frame format is selected for transmission/reception
+- Serial Peripheral Interface (SPI)
+- SPI speed **less than 2 MHz**
+- SPI frame format with **LSB transmitted first!**
+- Default **8-bit data frame** format is selected for transmission/reception
+- Default CPOL: CK to 0 when idle, CPHA: the first clock transition is the first data capture edge
 
-## Features:
+## Driver features:
 
-- Reading/setting clock and calendar data in 12-hour or 24-hour format.
-- Changing hour format without resetting it. `set_clock_mode()`
+- Reading/setting clock/calendar data 
+- 12-hour (AM/PM) or 24-hour format
+- Changing the time format while the chip is working
 
-## TODO:
 
-- RAM support.
+  NEW (4.0.0 release):
+- Programmable Trickle Charger configuration
+- 31 x 8 Battery-Backed General-Purpose RAM operations
 
 ## Examples
 https://github.com/Nekspire/ds1302-rs/tree/master/examples

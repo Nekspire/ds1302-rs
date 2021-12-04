@@ -1,6 +1,6 @@
 [package]
 name = "ds1302"
-version = "3.0.0"
+version = "4.0.0"
 authors = ["Nekspire  <nekspire@gmail.com>"]
 edition = "2018"
 description = "A platform agnostic driver to interface with the DS1302 real time clock-calendar"
@@ -43,4 +43,8 @@ opt-level = 3
 
 [[example]]
 name = "bluepill_ssd1306"
+crate-type = ["bin"]
+
+[[example]]
+name = "bluepill_serial"
 crate-type = ["bin"]
