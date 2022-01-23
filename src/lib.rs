@@ -47,25 +47,7 @@ pub enum Ds1302Error {
     Unknown,
 }
 
-/// For timing `ds1302` uses [fugit](https://lib.rs/crates/fugit) crate which only provides `Duration` and `Instant` types.
-/// It does not provide any clock or timer traits.
-/// Therefore `ds1302` has its own `Delay` trait that provides all timing capabilities that are needed for the library.
-/// User must implement this trait for the timer by itself.
-pub trait Delay<const TIMER_HZ: u32> {
-    /// An error that might happen during waiting
-    type Error;
-
-    /// Return current time `Instant`
-    fn now(&mut self) -> fugit::TimerInstantU32<TIMER_HZ>;
-
-    /// Start countdown with a `duration`
-    fn start(&mut self, duration: fugit::TimerDurationU32<TIMER_HZ>) -> Result<(), Self::Error>;
-
-    /// Wait until countdown `duration` has expired.
-    /// Must return `nb::Error::WouldBlock` if countdown `duration` is not yet over.
-    /// Must return `OK(())` as soon as countdown `duration` has expired.
-    fn wait(&mut self) -> nb::Result<(), Self::Error>;
-}
+pub use fugit_timer::Timer as Delay;
 
 ///DS1302 RTCC driver
 pub struct DS1302<SPI, CS, CLK, const TIMER_HZ: u32>
