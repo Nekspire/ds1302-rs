@@ -24,6 +24,7 @@ include = [
 embedded-hal = "0.2.4"
 nb = "1.0.0"
 fugit = "0.3.0"
+fugit-timer = "0.1.3"
 
 [dev-dependencies]
 stm32f1xx-hal = {path = "examples/stm32f1xx-hal", version = "0.7.0", features = ["rt", "stm32f103", "medium"]}

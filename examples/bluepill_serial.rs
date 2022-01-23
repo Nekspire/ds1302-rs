@@ -43,6 +43,10 @@ impl<TIM, const TIMER_HZ: u32> Delay<TIMER_HZ> for MyClock<TIM, TIMER_HZ> {
         Ok(())
     }
 
+    fn cancel(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     fn wait(&mut self) -> nb::Result<(), Self::Error> {
         Ok(())
     }
